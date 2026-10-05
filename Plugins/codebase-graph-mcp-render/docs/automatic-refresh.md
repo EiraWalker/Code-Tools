@@ -69,12 +69,21 @@ Run a single backend process/instance; cross-process coordination is not provide
 
 Ordinary queries are entirely local, including after automatic synchronization.
 The original build-time download remains a bootstrap mechanism for a fresh
-deployment, not the refresh mechanism. A valid runtime manifest survives process
-restart on the same filesystem. Render's free ephemeral filesystem is not a
-persistent disk: a new deployment can bootstrap an older configured snapshot.
+deployment, not the refresh mechanism. A valid runtime manifest can recover on
+the same surviving filesystem. Render Free loses runtime filesystem changes
+when it redeploys, restarts or spins down after inactivity. Thus the next instance
+can load an older build-time snapshot until the existing publisher runs again.
 After deploying, run the existing publisher once to seed the current version;
-future successful publications update it automatically. To preserve generations
-across replacement instances, use a persistent disk on a suitable Render plan.
+future successful publications update it automatically. This automatic update
+path is verified; durable recovery across idle/restart is a separate requirement.
+See [Render Free filesystem limits](https://render.com/docs/free).
+
+Persistent disks require a suitable paid plan and a runtime initialization path:
+disks are not available during Render builds, so do not merely point the existing
+build-time `CBM_CACHE_DIR` at an empty disk mount. A persistence extension must
+copy/validate the bootstrap artifact only when the runtime disk has no valid
+active manifest, then preserve later generations. This template does not upgrade
+the service or provision paid storage automatically.
 
 Verify a publisher run completes with `Graph reader cache: refreshed.` or
 `unchanged.`. Then call `list_projects` and compare returned snapshot blob SHA,
