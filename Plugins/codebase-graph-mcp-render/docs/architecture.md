@@ -41,6 +41,10 @@ ChatGPT 路线额外使用 Sites 的平台 OAuth 与 owner-private 访问控制�
 
 通用 Cloudflare Worker 不会自动提供 Sites 的信任边界。不要在公网裸 Worker 中信任客户端可自行设置的 `oai-authenticated-user-id`。
 
+下图展示 ChatGPT 路线的请求顺序与认证边界。未获授权的请求在 Sites 平台被拒绝；获准请求携带平台认证后的身份进入网关，再由网关使用独立服务密钥调用 Render。
+
+![ChatGPT、Sites 平台、网关 Worker 与 Render 的认证时序](images/chatgpt-mcp-auth-sequence.png)
+
 ## 快照来源
 
 MCP 宿主可能省略 `_meta`。所以后端在 `structuredContent.graph_snapshot` 和追加文本块中同时返回仓库、图谱路径及校验值。原生结果的原有字段和第一个文本块保持不变。

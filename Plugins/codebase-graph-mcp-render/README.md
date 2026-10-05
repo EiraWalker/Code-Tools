@@ -27,6 +27,14 @@
 | 查询指令 | MCP 初始化指令及各工具说明，随同一连接提供 | 是 |
 | 图谱与密钥 | 你的私人输入 | 否 |
 
+### ChatGPT 请求与认证流程
+
+![ChatGPT 经 Sites 平台和网关 Worker 访问 Render 的请求与认证时序](docs/images/chatgpt-mcp-auth-sequence.png)
+
+ChatGPT 携带用户 OAuth 令牌发起 MCP 请求。Sites 平台验证令牌和访问名单，拒绝未获授权的请求；通过验证后，将请求与已认证身份交给网关 Worker。网关检查身份和工具范围，再使用独立的服务端密钥访问 Render。Render 校验服务密钥与查询范围，执行查询，并通过网关将图谱结果返回 ChatGPT。
+
+用户 OAuth 令牌用于平台访问控制；Render 服务密钥由网关在服务端使用。此图描述 ChatGPT 路线，其他支持后端认证的客户端可直接连接 Render。
+
 ## 五个接口
 
 | 工具 | 用途 |
