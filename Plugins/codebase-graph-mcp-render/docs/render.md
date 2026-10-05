@@ -1,0 +1,49 @@
+# 构建自己的 Render 后端
+
+## Blueprint 路线
+
+Fork 或复制这个公开模板。导入根目录 `render.yaml`。为当前账户使用唯一服务名，选择适合预算的地域及方案。
+
+模板默认是 Python 3.12.12、Free、手动部署、健康检查 `/health`。
+构建命令 `bash backend/build-render.sh`；启动命令 `python backend/server.py`。
+构建会安装锁定依赖、获取固定上游提交、编译单进程入口并校验快照。
+
+部署时配置以下私有输入：
+
+| 变量 | 含义 |
+| --- | --- |
+| `CBM_PROJECT` | 快照缓存名，不含 `.db` 或路径分隔符 |
+| `CBM_SOURCE_REPOSITORY` | 用于来源说明的仓库标识 |
+| `CBM_GRAPH_PATH` | 来源仓库中的图谱路径 |
+| `CBM_GRAPH_SHA256` | 64 位小写十六进制 SHA256 |
+| `CBM_GRAPH_BLOB_SHA` | 40 位小写十六进制 Git blob SHA |
+| `CBM_GRAPH_URL` | 授权 HTTPS 原始字节下载入口 |
+| `CBM_GRAPH_BEARER_TOKEN` | 下载来源的可选凭据；公开源可设为空 |
+| `CBM_SERVICE_TOKEN` | 随机服务端密钥，至少 32 字符 |
+
+本机可用 `python -c 'import secrets; print(secrets.token_urlsafe(48))'` 生成服务密钥，再通过平台秘密字段保存。不要贴到公开帖子或提交文件。
+
+其他变量已由 Blueprint 设置。生产 origin 使用 Render 返回的 `RENDER_EXTERNAL_URL`；不硬编码别人的域名。
+
+## Render API / 插件路线
+
+优先复用已连接的 Render 插件，先读取用户选择的 workspace 与已有服务。工具只读查询不会创建资源。
+
+如果用官方 REST API：
+
+1. 在自己的账户创建 API key，通过环境变量 `RENDER_API_KEY` 提供给部署工具。
+2. 根据当前官方 OpenAPI 读取创建服务的 schema。不要猜 ownerId、serviceId 或环境字段。
+3. 创建服务，指定本人的模板仓库、分支、上述构建/启动命令、方案和环境配置。
+4. 保留创建响应的 service ID、origin 和 deployment ID。
+5. 查询指定部署直到 live 或失败终态。发生失败先看这次部署日志，不重复创建同名资源。
+6. 配置变化后部署并执行实际 MCP 验证。
+
+Render API key 是管理凭据，`CBM_SERVICE_TOKEN` 是查询后端凭据，`CBM_GRAPH_BEARER_TOKEN` 是图谱来源凭据。三者不能互换。
+
+官方文档：[API](https://render.com/docs/api)、[API reference](https://api-docs.render.com/reference/introduction)、[Blueprint](https://render.com/docs/blueprint-spec)。API schema 会演进，因此模板不附带容易过时的手写创建 JSON。
+
+## 冷启动与数据持久性
+
+Free 会因空闲休眠，首次请求可能等待约一分钟。它使用临时文件系统，不支持持久磁盘。生产项目需要评估付费计算和存储。见 [官方限制](https://render.com/docs/free)。
+
+快照应在构建产物中准备，或在启动前从可重复授权来源恢复。这个模板采用构建阶段准备，不能把运行时临时上传的 `.db` 当成持久备份。

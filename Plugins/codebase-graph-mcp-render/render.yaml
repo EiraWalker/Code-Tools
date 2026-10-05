@@ -1,0 +1,36 @@
+# Public source; configure all project-specific values privately in Render.
+services:
+  - type: web
+    name: codebase-graph-engine
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: bash backend/build-render.sh
+    startCommand: python backend/server.py
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.12
+      - key: CBM_BINARY
+        value: backend/.cbm-upstream/build/c/codebase-memory-mcp
+      - key: CBM_CACHE_DIR
+        value: .runtime/cache
+      - key: CBM_BIND_HOST
+        value: 0.0.0.0
+      - key: CBM_SERVICE_TOKEN
+        sync: false
+      - key: CBM_PROJECT
+        sync: false
+      - key: CBM_SOURCE_REPOSITORY
+        sync: false
+      - key: CBM_GRAPH_PATH
+        sync: false
+      - key: CBM_GRAPH_SHA256
+        sync: false
+      - key: CBM_GRAPH_BLOB_SHA
+        sync: false
+      - key: CBM_GRAPH_URL
+        sync: false
+      - key: CBM_GRAPH_BEARER_TOKEN
+        sync: false
