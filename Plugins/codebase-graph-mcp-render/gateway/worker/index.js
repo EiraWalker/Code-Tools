@@ -1,24 +1,25 @@
-const READER_INSTRUCTIONS = "Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Never expose service credentials or change project scope.";
+const READER_INSTRUCTIONS = "Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Choose any configured index listed by list_projects; pass its exact project name to every graph query. Each project has its own snapshot provenance and cache. Changing projects requires no additional plugin. When the user requests a new GitHub source, use add_index with the repository or graph link; if it returns multiple candidates, select the requested graph_path. Registration consumes an existing compatible .db graph, not source code. Private GitHub credentials belong in backend configuration, never chat. New projects appear in list_projects without another plugin or deployment. Keep refresh_warning visible when a cached graph is served after a remote check failure; never expose service credentials.";
 const TOOL_GUIDANCE = {
-  "list_projects": "Start here to obtain the real project name and snapshot provenance. Then use get_architecture, search_graph, trace_path with a returned qualified name, and query_graph for read-only relationships. This single Codebase Graph Reader connection includes the whole workflow; no separate Engine or instructions plugin is required.",
+  "list_projects": "Start here to list configured indexes and obtain each real project name and snapshot provenance. Choose the requested index and pass its exact name as project to subsequent tools. Then use get_architecture, search_graph, trace_path with a returned qualified name, and query_graph for read-only relationships. This single Codebase Graph Reader connection includes the whole workflow; no separate Engine or instructions plugin is required.",
   "get_architecture": "Use after list_projects to establish graph scope and limitations before searching symbols.",
   "search_graph": "Use actual project names from list_projects. Reuse returned qualified names for trace_path; preserve paging and truncation.",
   "trace_path": "Use a qualified name returned by search_graph or query_graph, not a guessed symbol. Missing edges may reflect snapshot coverage.",
+  "add_index": "Use when the user asks to add a GitHub graph or project. Register its original .db snapshot, then use list_projects and query it by the returned project name. Keep credentials in private backend configuration.",
   "query_graph": "Run read-only Cypher through the native engine. Keep graph_snapshot provenance and report native errors; do not fall back to a custom SQL implementation."
 };
 
 const QUERY_TOOLS = new Set([
-  "list_projects", "get_architecture", "search_graph", "trace_path", "query_graph"
+  "list_projects", "get_architecture", "search_graph", "trace_path", "query_graph", "add_index"
 ]);
 const page = `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Codebase Graph Reader</title><style>
 body{font-family:system-ui,sans-serif;background:#101923;color:#e9edf1;max-width:48rem;margin:10vh auto;padding:2rem;line-height:1.7}
 h1{font-weight:600}code{color:#8cd2bd}a{color:#8cd2bd}</style></head><body>
-<h1>Codebase Graph Reader</h1><p>通过原生查询接口读取 你的项目 代码图谱。</p>
+<h1>Codebase Graph Reader</h1><p>通过同一个原生查询接口读取已配置的多个项目代码图谱。</p>
 <p>连接个人插件后，可以查询项目、架构、符号、调用路径和图关系。</p>
-<p><code>list_projects · get_architecture · search_graph · trace_path · query_graph</code></p>
-<p>此入口仅供拥有访问权限的账户使用。图谱快照经过完整性校验，查询保持只读。</p>
+<p><code>add_index · list_projects · get_architecture · search_graph · trace_path · query_graph</code></p>
+<p>此入口仅供拥有访问权限的账户使用。图谱快照经过完整性校验，五个图谱查询接口保持只读；add_index 用于添加已有的 GitHub 图谱。</p>
 </body></html>`;
 
 function reply(body, status = 200) {
@@ -58,7 +59,7 @@ export default {
       const service = equalSecret(request.headers.get("x-graph-reader-service-token"), env.CBM_SERVICE_TOKEN);
       if (!user && !service) return reply({error: "Authenticated graph access required"}, 403);
       if (!QUERY_TOOLS.has(message.params?.name)) return reply({jsonrpc: "2.0", id: message.id,
-        result: {isError: true, content: [{type: "text", text: "Only the five read-only graph query tools are available"}]}});
+        result: {isError: true, content: [{type: "text", text: "Only graph query and index registration tools are available"}]}});
     } else if (!discovery.has(method)) {
       return reply({jsonrpc: "2.0", id: message.id ?? null, error: {code: -32601, message: "Method not found"}});
     }

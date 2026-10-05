@@ -6,7 +6,7 @@
 
 这套方案把执行端移到 Render。聊天端调用已连接的远程 MCP 工具，后端用上游原生实现直接读取原始 SQLite `.db` 快照。图谱不会先被导出为 Markdown、摘要或一套自制 SQL API。
 
-提供五个查询接口：
+提供五个原生查询接口，并可通过 `add_index` 从 GitHub 链接添加已有索引：
 
 - `list_projects`：确认项目；
 - `get_architecture`：查看架构、语言和包；
@@ -16,7 +16,7 @@
 
 仓库包含 C 原生入口、Python HTTP MCP、Render Blueprint、快照下载与完整性校验、ChatGPT 私有 Sites 网关、随 MCP 提供的使用指令，以及可以直接给 Agent 的部署任务。
 
-用户只连接一个 **Codebase Graph Reader** 插件，它同时提供五个工具与查询工作流。Render 上的原生引擎是后端组件，不再拆成一个 Reader 加一个 Reader Engine 插件。
+用户只连接一个 **Codebase Graph Reader** 插件，它同时提供五个查询工具、索引注册和查询工作流。Render 上的原生引擎是后端组件，不再拆成一个 Reader 加一个 Reader Engine 插件。
 
 ChatGPT 路线由 Sites 处理平台 OAuth，Render 保存服务端查询密钥。静态 Bearer 密钥没有被当成 OAuth，也不会写进插件包。其他 MCP 客户端可以按自身的认证能力连接。
 
@@ -24,7 +24,7 @@ ChatGPT 路线由 Sites 处理平台 OAuth，Render 保存服务端查询密钥�
 
 原型已经验证过真实原生查询、符号搜索、调用路径和分页。模板附带传输/认证测试，并提供基于用户授权快照副本的原生集成验证脚本。新部署仍需用自己的图谱，在目标宿主执行一次完整验收；只有服务器显示 live 不够。
 
-这是单项目图谱快照方案，不会自动同步最新代码，也没有编辑文件或在线索引功能。Render 免费实例适合试验，但有休眠与临时文件系统限制。长期使用需要评估资源和可靠性。
+现在同一个 MCP 可以注册多个 GitHub 图谱，按项目选择、独立缓存和刷新。已有索引 Actions 可推送更新；链接注册项目会检查 blob 变化。远程源码变化但尚未重新生成 `.db` 时，阅读器仍读取原有索引。没有编辑文件或在线索引生成功能。Render 免费实例适合试验，但有休眠与临时文件系统限制。长期使用需要评估资源和可靠性。
 
 上游项目：https://github.com/DeusData/codebase-memory-mcp
 
@@ -32,4 +32,4 @@ ChatGPT 路线由 Sites 处理平台 OAuth，Render 保存服务端查询密钥�
 
 公开模板不包含真实图谱、私人项目资料、部署标识或凭据。每个人使用自己的数据、账户和服务。
 
-欢迎讨论：你更需要多项目隔离、自动快照更新，还是直接由原生索引器在云端生成图谱？
+欢迎讨论：你的索引发布流程更适合 Actions 推送更新，还是 GitHub 链接加版本检查？

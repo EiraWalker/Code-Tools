@@ -44,6 +44,8 @@ def exchange(origin):
 def sync_once(origin, data, identity):
     token = exchange(origin)
     headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+    if identity.get("project"):
+        headers["X-Snapshot-Project"] = identity["project"]
     with urlopen(Request(origin + "/snapshot-sync", data=json.dumps(identity).encode(),
                          headers=headers, method="POST"), timeout=90) as response:
         status = json.load(response)["status"]
@@ -74,7 +76,8 @@ def main():
         raise ValueError("Expected an original SQLite graph")
     identity = {"sha256": hashlib.sha256(data).hexdigest(),
                 "blob_sha": hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest(),
-                "size_bytes": len(data), "source_commit": os.environ["GITHUB_SHA"]}
+                "size_bytes": len(data), "source_commit": os.environ["GITHUB_SHA"],
+                "project": os.environ.get("CBM_SYNC_PROJECT", path.stem)}
     for attempt in range(6):
         try:
             status = sync_once(origin, data, identity)

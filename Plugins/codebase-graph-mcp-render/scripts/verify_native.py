@@ -35,7 +35,7 @@ async def verify(url, token, project):
             assert all(t.description for t in tools)
             assert 'no separate Engine' in next(t.description for t in tools if t.name == 'list_projects')
             names = {t.name for t in tools}
-            assert names == {'list_projects','get_architecture','search_graph','trace_path','query_graph'}
+            assert names == {'list_projects','get_architecture','search_graph','trace_path','query_graph','add_index'}
             projects = await client.call_tool('list_projects',{})
             assert not projects.isError and projects.structuredContent['projects'][0]['name'] == project
             architecture = await client.call_tool('get_architecture',{'project':project})

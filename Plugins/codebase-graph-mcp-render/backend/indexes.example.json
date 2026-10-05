@@ -1,0 +1,25 @@
+[
+  {
+    "project": "project-alpha",
+    "repository": "owner/graph-snapshots",
+    "path": "graphs/project-alpha.db",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "blob_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "url_env": "CBM_ALPHA_GRAPH_URL",
+    "publisher": {
+      "repository": "owner/source-alpha",
+      "repository_id": "42",
+      "owner_id": "7",
+      "ref": "refs/heads/main",
+      "workflow": ".github/workflows/code-index.yml"
+    }
+  },
+  {
+    "project": "project-beta",
+    "repository": "owner/other-snapshots",
+    "path": "graphs/project-beta.db",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "blob_sha": "dddddddddddddddddddddddddddddddddddddddd",
+    "url_env": "CBM_BETA_GRAPH_URL"
+  }
+]

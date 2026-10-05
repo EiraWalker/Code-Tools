@@ -12,7 +12,7 @@ management credentials. An `.env` example must contain placeholders only.
 The snapshot downloader requires HTTPS, rejects URL-embedded credentials,
 refuses redirects, validates size/header/SHA256/Git blob SHA, and atomically
 installs verified bytes. The graph engine checks scope and integrity before/after
-queries. The adapter exposes exactly five read tools and bounds native processes.
+queries. The adapter exposes five native read tools plus owner-authorized `add_index` registration and bounds native processes.
 This is not a multi-tenant service or a substitute for rate limits and production
 resource controls.
 
@@ -31,3 +31,7 @@ Also inspect the exact Git tree and the committed history before making it publi
 
 To report a vulnerability, avoid publishing exploit data or credentials. Use
 GitHub's private vulnerability reporting if the repository owner enables it.
+
+`add_index` only accepts HTTPS github.com repository/blob/tree links. API URLs are constructed for api.github.com; binary URLs must be repository-scoped raw.githubusercontent.com URLs returned by GitHub metadata. Redirects are refused. Backend GitHub tokens never enter MCP parameters/results and are not forwarded to raw downloads. Snapshot size, Git blob SHA, SHA256 and native project identity are verified before catalog activation. Each index has a separate cache and activation lock. All registered indexes share this App's owner-private audience; this is not a multi-tenant access policy.
+
+The public demo database is synthetic and contains no user repository content. SQLite writes in test fixture generation are not a graph-query implementation.

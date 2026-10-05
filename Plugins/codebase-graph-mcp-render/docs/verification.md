@@ -63,4 +63,10 @@ node gateway/scripts/check-access.mjs
 
 ## 单一插件验收
 
-MCP initialize 必须返回 Codebase Graph Reader 的 serverInfo.name 和完整 instructions；tools/list 必须只包含五个查询工具，带查询顺序、真实限定名和快照来源的说明。新增用户仅需安装 canonical 插件；验证过程不得依赖旧的额外指令插件。宿主若省略 initialize.instructions，使用工具说明继续同一流程。
+MCP initialize 必须返回 Codebase Graph Reader 的 serverInfo.name 和完整 instructions；tools/list 必须包含五个原生查询工具和适配层 `add_index`，不得暴露 `index_repository` 等原生写工具，带查询顺序、真实限定名和快照来源的说明。新增用户仅需安装 canonical 插件；验证过程不得依赖旧的额外指令插件。宿主若省略 initialize.instructions，使用工具说明继续同一流程。
+
+## 多索引与注册验证
+
+设置 `CBM_TEST_BINARY` 为原生 snapshot host 后运行全部 tests。测试使用合成图谱验证两个独立缓存的原生 Cypher、GitHub 注册、同一 blob 不重复下载、远程变化更新、损坏更新保留旧缓存、注册表在同一文件系统恢复，以及认证绑定目标项目。合成 fixture 的 SQLite 写入只用于构造公开测试数据，阅读器不执行 SQL 来代替查询。
+
+真实 MCP 宿主还需发现 `add_index`，调用公开合成样例，确认新增项目出现在 `list_projects`；重试同一链接应为 `already_registered`。对已有真实项目重复五个接口验收。免费实例冷启动会丢失运行时注册表，不能把同一文件系统的重启测试当成跨实例持久化证明。

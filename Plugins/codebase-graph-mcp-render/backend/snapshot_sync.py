@@ -11,13 +11,14 @@ class PublisherScopeError(ValueError):
 
 
 class PublisherAuth:
-    def __init__(self, origin):
+    def __init__(self, origin, config=None):
+        config = os.environ if config is None else config
         self.audience = origin + "/snapshot-sync"
-        self.repository = os.environ["CBM_SYNC_REPOSITORY"]
-        self.repository_id = os.environ["CBM_SYNC_REPOSITORY_ID"]
-        self.owner_id = os.environ.get("CBM_SYNC_OWNER_ID")
-        self.ref = os.environ.get("CBM_SYNC_REF", "refs/heads/main")
-        workflow = os.environ.get("CBM_SYNC_WORKFLOW", ".github/workflows/code-index.yml")
+        self.repository = config["CBM_SYNC_REPOSITORY"]
+        self.repository_id = config["CBM_SYNC_REPOSITORY_ID"]
+        self.owner_id = config.get("CBM_SYNC_OWNER_ID")
+        self.ref = config.get("CBM_SYNC_REF", "refs/heads/main")
+        workflow = config.get("CBM_SYNC_WORKFLOW", ".github/workflows/code-index.yml")
         self.workflow_ref = self.repository + "/" + workflow + "@" + self.ref
         self.keys = jwt.PyJWKClient(ISSUER + "/.well-known/jwks", timeout=15)
 

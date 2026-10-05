@@ -2,7 +2,7 @@
 
 让 AI Agent 通过远程 MCP 查询原始代码图谱。原生 `codebase-memory-mcp` 查询引擎运行在 Render，聊天端调用工具，不需要挂载插件二进制。
 
-这是可复用的单项目部署模板。你提供自己有权访问的 `.db` 快照，配置自己的认证入口，并创建自己的插件。本仓库不包含任何真实图谱、账户凭据、私人项目资料或已部署服务地址。
+这是可复用的多项目索引阅读 MCP。你提供自己有权访问的 `.db` 快照，配置自己的认证入口，并创建自己的插件。本仓库不包含任何真实私人图谱、账户凭据、私人项目资料或已部署服务地址。`tests/fixtures/reader-demo.db` 是只有三个节点和一条边的公开合成测试图谱，可用于验证 `add_index`。
 
 **只安装一个 Codebase Graph Reader 插件。** 使用指令通过 MCP `initialize.instructions` 和工具说明提供，不需要另装 Reader Engine 或 skills-only 包。
 
@@ -16,7 +16,7 @@
 2. Render 构建固定版本的原生引擎，并获取、校验你的快照。
 3. Python 适配器将原生查询结果通过 Streamable HTTP MCP 返回。
 4. ChatGPT 路线使用私有 Sites 网关处理平台 OAuth；其他客户端可按自身能力直接连接 Render。
-5. 同一个 Codebase Graph Reader 插件同时提供五个工具和 MCP 使用指令；Render 引擎是后端服务。
+5. 同一个 Codebase Graph Reader 插件提供五个原生查询工具、`add_index` 和 MCP 使用指令；Render 引擎是后端服务。
 
 | 组件 | 作用 | 是否包含在模板中 |
 | --- | --- | --- |
@@ -27,11 +27,12 @@
 | 查询指令 | MCP 初始化指令及各工具说明，随同一连接提供 | 是 |
 | 图谱与密钥 | 你的私人输入 | 否 |
 
-## 五个接口
+## 接口
 
 | 工具 | 用途 |
 | --- | --- |
-| `list_projects` | 确认可查询的项目 |
+| `add_index` | 从 GitHub 链接注册已有 `.db` 索引 |
+| `list_projects` | 列出可查询的项目及各自快照来源 |
 | `get_architecture` | 架构、语言、包和节点统计 |
 | `search_graph` | 查找符号及限定名 |
 | `trace_path` | 查询调用者、被调用者及图路径 |
@@ -43,6 +44,7 @@
 
 - [给 Agent 的完整执行指令](AGENT_SETUP.md)
 - [后续维护与 API 部署顺序](MAINTENANCE.md)
+- [通过 MCP 添加项目与多索引配置](docs/multiple-indexes.md)
 - [复用已有索引 Actions 自动刷新缓存](docs/automatic-refresh.md)
 - [准备你自己的索引快照](docs/snapshot.md)
 - [Render 部署与 API 管理](docs/render.md)
@@ -66,7 +68,7 @@ node gateway/scripts/check-access.mjs
 
 ## 范围与限制
 
-只查询一个图谱快照。没有在线索引、文件编辑、源码片段或自动快照同步。图谱遗漏不等于代码不存在。Unity 等引擎的运行时回调和序列化引用可能未被完整记录。
+支持多个隔离图谱缓存，按 `project` 选择。已有发布流水线通过 OIDC 推送刷新；`add_index` 新增的项目在使用时按间隔检查 GitHub blob，变化才下载，失败时返回 `refresh_warning` 并保留旧缓存。没有在线索引生成、文件编辑或源码片段工具。图谱遗漏不等于代码不存在。Unity 等引擎的运行时回调和序列化引用可能未被完整记录。
 
 `CBM_SERVICE_TOKEN` 是后端服务认证，不是 ChatGPT OAuth。不要把 Render 的服务端密钥写进插件文件。不要把 Sites 的可信身份头机制直接搬到裸露的通用 Worker 上。
 

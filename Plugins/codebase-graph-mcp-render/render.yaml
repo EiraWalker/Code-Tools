@@ -21,6 +21,14 @@ services:
         value: 0.0.0.0
       - key: CBM_SERVICE_TOKEN
         sync: false
+      # Optional multi-index bootstrap catalog; empty keeps legacy configuration.
+      - key: CBM_INDEXES_JSON
+        value: ""
+      # Optional Contents-read credential for private GitHub add_index sources.
+      - key: CBM_GITHUB_TOKEN
+        value: ""
+      - key: CBM_GITHUB_CHECK_SECONDS
+        value: "300"
       - key: CBM_PROJECT
         sync: false
       - key: CBM_SOURCE_REPOSITORY

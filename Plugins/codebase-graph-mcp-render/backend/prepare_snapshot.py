@@ -9,20 +9,21 @@ from urllib.parse import urlsplit
 import httpx
 
 
-def prepare(client=None):
-    project = os.environ['CBM_PROJECT']
+def prepare(client=None, config=None):
+    config = os.environ if config is None else config
+    project = config['CBM_PROJECT']
     if not project or project in {'.', '..'} or any(c in project for c in '/\\\0'):
         raise ValueError('Invalid project filename stem')
-    sha256 = os.environ['CBM_GRAPH_SHA256']
-    blob_sha = os.environ['CBM_GRAPH_BLOB_SHA']
+    sha256 = config['CBM_GRAPH_SHA256']
+    blob_sha = config['CBM_GRAPH_BLOB_SHA']
     if not re.fullmatch('[a-f0-9]{64}', sha256) or not re.fullmatch('[a-f0-9]{40}', blob_sha):
         raise ValueError('Expected hexadecimal snapshot checksums')
-    cache = Path(os.environ['CBM_CACHE_DIR'])
+    cache = Path(config['CBM_CACHE_DIR'])
     cache.mkdir(parents=True, exist_ok=True)
     graph = cache / (project + '.db')
     if any(p != graph for p in cache.glob('*.db')):
         raise ValueError('Cache must contain only the configured project')
-    maximum = int(os.environ.get('CBM_GRAPH_MAX_BYTES', '268435456'))
+    maximum = int(config.get('CBM_GRAPH_MAX_BYTES', '268435456'))
     def validate(path):
         size = path.stat().st_size
         if size > maximum:
@@ -40,12 +41,12 @@ def prepare(client=None):
     if graph.exists():
         validate(graph)
         return graph
-    url = os.environ['CBM_GRAPH_URL']
+    url = config['CBM_GRAPH_URL']
     parsed = urlsplit(url)
     if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError('Use an HTTPS source without embedded credentials')
     headers = {'Accept': 'application/vnd.github.raw+json'}
-    token = os.environ.get('CBM_GRAPH_BEARER_TOKEN')
+    token = config.get('CBM_GRAPH_BEARER_TOKEN')
     if token:
         headers['Authorization'] = 'Bearer ' + token
     own_client = client is None
@@ -76,7 +77,9 @@ def prepare(client=None):
 
 if __name__ == '__main__':
     try:
-        prepare()
+        from index_catalog import load_indexes
+        for config in load_indexes().values():
+            prepare(config=config)
         print('Original graph snapshot integrity verified')
     except Exception as error:
         # HTTP exceptions can contain credential-bearing URLs. Do not print them.

@@ -29,7 +29,7 @@ flowchart TD
 
 ## HTTP 适配器
 
-`backend/server.py` 通过原生 stdio `tools/list` 获取真实 schema，再只公开五个查询工具。每次调用由原生 `--call` 入口处理；Cypher 也交给上游引擎，不用 Python SQL 重新实现。
+`backend/server.py` 通过原生 stdio `tools/list` 获取真实 schema，再公开五个查询工具；适配层另提供 `add_index` 注册接口。每次调用由原生 `--call` 入口处理；Cypher 也交给上游引擎，不用 Python SQL 重新实现。
 
 适配器只允许配置的项目，将数据库完整性校验放在调用前后，限制并发数，并保留原生错误、分页及截断语义。独立快照缓存中不能混入其他项目。
 
@@ -57,4 +57,6 @@ MCP 宿主可能省略 `_meta`。所以后端在 `structuredContent.graph_snapsh
 
 下载脚本默认限制快照为 256 MiB。后端为了完整性校验会读数据库字节；查询引擎也需要内存。大型项目应测量内存、查询时间和冷启动，调整实例与设计。改变大小上限不等于增加可用内存。
 
-模板只实现单项目与一个受信任的索引生成工作流。多用户隔离、按用户选图、增量索引和通用后台抓取需要独立设计，不能仅删除项目范围检查。
+`index_catalog.py` 负责私有配置和每项目缓存目录。`Catalog` 使用真实 `project` 分派五个原生接口，汇总分页的 `list_projects` 为每项目保留来源。`github_indexes.py` 负责 GitHub 链接注册、签名原始下载校验、注册表原子保存和远程 blob 检查。已有发布流水线的 OIDC 策略与 run 水位也按项目隔离。
+
+所有项目仍属于同一个 owner-private App 的授权范围；这不是按访客隔离的多租户服务。增量索引和源码索引生成不属于阅读器职责。

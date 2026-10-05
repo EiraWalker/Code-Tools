@@ -23,24 +23,35 @@ from starlette.routing import Route
 from snapshot_cache import SnapshotCache
 from snapshot_sync import PublisherAuth, PublisherScopeError, validate_identity
 import jwt
+from index_catalog import load_indexes
+from github_indexes import GitHubIndexes
 
-READER_INSTRUCTIONS = 'Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Never expose service credentials or change project scope.'
-TOOL_GUIDANCE = {'list_projects': 'Start here to obtain the real project name and snapshot provenance. Then use get_architecture, search_graph, trace_path with a returned qualified name, and query_graph for read-only relationships. This single Codebase Graph Reader connection includes the whole workflow; no separate Engine or instructions plugin is required.', 'get_architecture': 'Use after list_projects to establish graph scope and limitations before searching symbols.', 'search_graph': 'Use actual project names from list_projects. Reuse returned qualified names for trace_path; preserve paging and truncation.', 'trace_path': 'Use a qualified name returned by search_graph or query_graph, not a guessed symbol. Missing edges may reflect snapshot coverage.', 'query_graph': 'Run read-only Cypher through the native engine. Keep graph_snapshot provenance and report native errors; do not fall back to a custom SQL implementation.'}
+READER_INSTRUCTIONS = 'Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Choose any configured index listed by list_projects; pass its exact project name to every graph query. Each project has its own snapshot provenance and cache. Changing projects requires no additional plugin. When the user requests a new GitHub source, use add_index with the repository or graph link; if it returns multiple candidates, select the requested graph_path. Registration consumes an existing compatible .db graph, not source code. Private GitHub credentials belong in backend configuration, never chat. New projects appear in list_projects without another plugin or deployment. Keep refresh_warning visible when a cached graph is served after a remote check failure; never expose service credentials.'
+TOOL_GUIDANCE = {'list_projects': 'Start here to list configured indexes and obtain each real project name and snapshot provenance. Choose the requested index and pass its exact name as project to subsequent tools. Then use get_architecture, search_graph, trace_path with a returned qualified name, and query_graph for read-only relationships. This single Codebase Graph Reader connection includes the whole workflow; no separate Engine or instructions plugin is required.', 'get_architecture': 'Use after list_projects to establish graph scope and limitations before searching symbols.', 'search_graph': 'Use actual project names from list_projects. Reuse returned qualified names for trace_path; preserve paging and truncation.', 'trace_path': 'Use a qualified name returned by search_graph or query_graph, not a guessed symbol. Missing edges may reflect snapshot coverage.', 'query_graph': 'Run read-only Cypher through the native engine. Keep graph_snapshot provenance and report native errors; do not fall back to a custom SQL implementation.'}
 
-PROJECT = os.environ["CBM_PROJECT"]
-if not PROJECT or PROJECT in {".", ".."} or any(c in PROJECT for c in "/\\\0"):
-    raise ValueError("CBM_PROJECT must be one cache filename stem")
 EXPOSED = {"list_projects", "get_architecture", "search_graph", "trace_path", "query_graph"}
+
+ADD_INDEX_TOOL = types.Tool(name="add_index", description="Register an original codebase-memory-mcp .db snapshot from a GitHub repository, blob or tree link. Downloads once, validates through the native reader, then caches the graph. If multiple .db files exist, returns candidates: repeat with graph_path. Does not generate indexes or read repository source. Private repositories require backend-configured GitHub Contents read credentials, never chat credentials. New indexes are checked for remote changes on use (default every 300 seconds); unchanged blobs are never downloaded again. Changes the authorized project's catalog; all five graph query tools remain read-only.",
+    inputSchema={"type": "object", "properties": {
+        "github_url": {"type": "string", "description": "HTTPS github.com repository root, blob or tree link."},
+        "graph_path": {"type": "string", "description": "Optional relative path to one original uncompressed .db graph."},
+        "ref": {"type": "string", "description": "Branch/tag/commit; defaults to repository default branch. Supply explicitly for ambiguous slash-containing refs."},
+        "project": {"type": "string", "description": "Original project identity in the graph; defaults to database filename stem. This does not rename graph contents."}},
+        "required": ["github_url"], "additionalProperties": False},
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True))
 
 
 class Engine:
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
+        self.project = config["CBM_PROJECT"]
         self.binary = Path(os.environ["CBM_BINARY"]).resolve()
-        self.cache = Path(os.environ["CBM_CACHE_DIR"]).resolve()
-        self.snapshots = SnapshotCache(self.cache, PROJECT, os.environ["CBM_GRAPH_SHA256"],
-                                       os.environ["CBM_GRAPH_BLOB_SHA"],
-                                       int(os.environ.get("CBM_GRAPH_MAX_BYTES", "268435456")))
-        self.env = {**os.environ, "CBM_CACHE_DIR": str(self.cache), "CBM_LOG_LEVEL": "error"}
+        self.cache = Path(config["CBM_CACHE_DIR"]).resolve()
+        self.snapshots = SnapshotCache(self.cache, self.project, config["CBM_GRAPH_SHA256"],
+                                       config["CBM_GRAPH_BLOB_SHA"],
+                                       int(config.get("CBM_GRAPH_MAX_BYTES", "268435456")))
+        self.env = {**{k: v for k, v in os.environ.items() if k in {"PATH", "LD_LIBRARY_PATH", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT"}},
+                    "CBM_CACHE_DIR": str(self.cache), "CBM_LOG_LEVEL": "error"}
         if not self.binary.is_file() or not os.access(self.binary, os.X_OK):
             raise ValueError("CBM_BINARY must be an executable native snapshot host")
         requests = [
@@ -69,7 +80,7 @@ class Engine:
         payload = envelope.get("structuredContent")
         if not payload or "projects" not in payload:
             payload = json.loads(next(c["text"] for c in envelope["content"] if c["type"] == "text"))
-        if [p["name"] for p in payload.get("projects", [])] != [PROJECT]:
+        if [p["name"] for p in payload.get("projects", [])] != [self.project]:
             raise ValueError("Candidate project does not match the configured scope")
 
     def _native(self, name, arguments, snapshot):
@@ -86,22 +97,87 @@ class Engine:
             raise ValueError("Only the five snapshot query tools are exposed")
         arguments = dict(arguments)
         if name != "list_projects":
-            if arguments.get("project", PROJECT) != PROJECT:
+            if arguments.get("project", self.project) != self.project:
                 raise ValueError("Requested project is outside this service's scope")
-            arguments["project"] = PROJECT
+            arguments["project"] = self.project
         arguments.setdefault("format", "json")
         self.snapshots.validate(snapshot)
         envelope = self._native(name, arguments, snapshot)
         self.snapshots.validate(snapshot)
         envelope["_meta"] = {**envelope.get("_meta", {}), "graph_snapshot": {
-            "repository": os.environ["CBM_SOURCE_REPOSITORY"], "project": PROJECT,
-            "path": os.environ["CBM_GRAPH_PATH"],
+            "repository": self.config["CBM_SOURCE_REPOSITORY"], "project": self.project,
+            "path": self.config["CBM_GRAPH_PATH"],
             "blob_sha": snapshot.blob_sha, "sha256": snapshot.sha256,
             **({"source_commit": snapshot.source_commit} if snapshot.source_commit else {})}}
         snapshot = envelope["_meta"]["graph_snapshot"]
         envelope["structuredContent"] = {**envelope.get("structuredContent", {}), "graph_snapshot": snapshot}
         envelope["content"] = [*envelope.get("content", []), {"type": "text", "text": json.dumps({"graph_snapshot": snapshot})}]
         return types.CallToolResult.model_validate(envelope)
+
+
+class ProjectSelectionError(ValueError):
+    """Safe client guidance without private configuration or credentials."""
+
+
+class Catalog:
+    def __init__(self, configs, engine_factory=Engine):
+        self.engines = {project: engine_factory(config) for project, config in configs.items()}
+        self.tools = [*next(iter(self.engines.values())).tools, ADD_INDEX_TOOL]
+        self.github = None
+        for engine in self.engines.values():
+            engine.validate_candidate(engine.snapshots.active)
+
+    def query(self, engine, name, arguments):
+        if self.github:
+            self.github.refresh(engine.project)
+        result = engine.call(name, arguments)
+        if self.github and engine.project in self.github.errors:
+            warning = self.github.errors[engine.project]
+            result.structuredContent = {**(result.structuredContent or {}), "refresh_warning": warning}
+            result.content.append(types.TextContent(type="text", text=warning))
+        return result
+
+    def select(self, project):
+        if project is None and len(self.engines) == 1:
+            return next(iter(self.engines.values()))
+        if not isinstance(project, str) or project not in self.engines:
+            raise ProjectSelectionError("Choose a configured project from list_projects and pass its exact name as project.")
+        return self.engines[project]
+
+    def call(self, name, arguments):
+        arguments = arguments or {}
+        if name == "add_index":
+            if self.github is None:
+                raise ValueError("GitHub registration is unavailable")
+            error, payload = self.github.result(arguments)
+            return types.CallToolResult(isError=error, content=[types.TextContent(type="text", text=json.dumps(payload))], structuredContent=payload)
+        if name != "list_projects":
+            engine = self.select(arguments.get("project"))
+            return self.query(engine, name, arguments)
+        if len(self.engines) == 1:
+            return self.query(next(iter(self.engines.values())), name, arguments)
+        offset, limit = arguments.get("offset", 0), arguments.get("limit", 50)
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 500:
+            raise ValueError("Invalid catalog pagination")
+        # Page the configured catalog, then ask the native reader for each selected index.
+        engines = list(self.engines.values())[offset:offset + limit]
+        projects, snapshots = [], {}
+        for engine in engines:
+            result = self.query(engine, name, {**arguments, "format": "json", "offset": 0, "limit": 1})
+            if result.isError:
+                return result
+            payload = result.structuredContent
+            if not payload or not payload.get("projects"):
+                raise ValueError("Configured native index is unavailable")
+            snapshot = payload["graph_snapshot"]
+            projects.extend({**p, "graph_snapshot": snapshot, **({"refresh_warning": payload["refresh_warning"]} if "refresh_warning" in payload else {})} for p in payload["projects"])
+            snapshots[engine.project] = snapshot
+        payload = {"projects": projects, "total": len(self.engines), "offset": offset, "limit": limit,
+                   "returned": len(projects), "has_more": offset + len(projects) < len(self.engines),
+                   "graph_snapshots": snapshots}
+        output = json.dumps(payload) if arguments.get("format", "json") == "json" else "\n".join(
+            [p["name"] for p in projects] + [json.dumps({k: v for k, v in payload.items() if k != "projects"})])
+        return types.CallToolResult(content=[types.TextContent(type="text", text=output)], structuredContent=payload)
 
 
 def create_app():
@@ -114,20 +190,24 @@ def create_app():
         raise ValueError("Public origin must be one origin without a path or query")
     if parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}):
         raise ValueError("Production origin must use HTTPS")
-    engine = Engine()
-    server = Server("codebase-graph-reader", version="0.3.0", instructions=READER_INSTRUCTIONS)
+    catalog = Catalog(load_indexes())
+    catalog.github = GitHubIndexes(catalog, os.environ["CBM_CACHE_DIR"], Engine)
+    server = Server("codebase-graph-reader", version="0.4.0", instructions=READER_INSTRUCTIONS)
     limit = anyio.CapacityLimiter(2)
     sync_limit = anyio.CapacityLimiter(1)
-    publisher = PublisherAuth(origin) if os.environ.get("CBM_SYNC_REPOSITORY") else None
+    publishers = {project: PublisherAuth(origin, engine.config)
+                  for project, engine in catalog.engines.items() if engine.config.get("CBM_SYNC_REPOSITORY")}
 
     @server.list_tools()
     async def list_tools():
-        return engine.tools
+        return catalog.tools
 
     @server.call_tool()
     async def call_tool(name, arguments):
         try:
-            return await anyio.to_thread.run_sync(engine.call, name, arguments, limiter=limit)
+            return await anyio.to_thread.run_sync(catalog.call, name, arguments, limiter=limit)
+        except ProjectSelectionError as error:
+            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=str(error))])
         except (ValueError, OSError, subprocess.SubprocessError):
             # Keep paths, arguments and private subprocess diagnostics out of HTTP errors.
             return types.CallToolResult(isError=True, content=[types.TextContent(
@@ -150,13 +230,22 @@ def create_app():
     @asynccontextmanager
     async def lifespan(app):
         async with manager.run():
-            yield
+            try:
+                yield
+            finally:
+                if catalog.github:
+                    catalog.github.source.client.close()
 
     async def health(request):
         return JSONResponse({"status": "ready"}, headers={"Cache-Control": "no-store"})
 
     async def sync_snapshot(request):
         headers = {"Cache-Control": "no-store"}
+        try:
+            engine = catalog.select(request.headers.get("x-snapshot-project"))
+        except ProjectSelectionError:
+            return JSONResponse({"error": "Select one configured project with X-Snapshot-Project"}, status_code=422, headers=headers)
+        publisher = publishers.get(engine.project)
         if publisher is None:
             return JSONResponse({"error": "Sync is disabled"}, status_code=404, headers=headers)
         try:
@@ -175,7 +264,10 @@ def create_app():
                     body.extend(chunk)
                     if len(body) > 4096:
                         raise ValueError("Snapshot metadata too large")
-                identity = validate_identity(json.loads(body), engine.snapshots.maximum)
+                metadata = json.loads(body)
+                if not isinstance(metadata, dict) or metadata.get("project", engine.project) != engine.project:
+                    raise ValueError("Snapshot project and selected index differ")
+                identity = validate_identity(metadata, engine.snapshots.maximum)
             else:
                 identity = validate_identity({"sha256": request.headers.get("x-snapshot-sha256"),
                     "blob_sha": request.headers.get("x-snapshot-blob-sha"),
