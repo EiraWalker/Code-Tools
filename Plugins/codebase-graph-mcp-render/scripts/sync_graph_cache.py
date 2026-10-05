@@ -21,6 +21,7 @@ def exchange(origin):
     with urlopen(request, timeout=30) as response:
         token = json.load(response)["value"]
     print("::add-mask::" + token, flush=True)
+    print("GitHub OIDC publisher identity obtained.", flush=True)
     return token
 
 
@@ -68,8 +69,9 @@ def main():
                     summary.write(message + "\n")
             return
         except HTTPError as error:
-            # A 422 is a rejected snapshot, not a transient service wakeup.
-            if error.code == 422 or attempt == 5:
+            # Log only status, never credential-bearing URLs or response bodies.
+            print("Cache sync HTTP status " + str(error.code), flush=True)
+            if error.code not in {429, 500, 502, 503, 504} or attempt == 5:
                 raise ValueError("Cache sync HTTP status " + str(error.code)) from None
         except (URLError, TimeoutError, OSError):
             if attempt == 5:
