@@ -40,6 +40,15 @@ class SnapshotTests(unittest.TestCase):
         graph = Path(self.temp.name)/'fixture.db'; graph.write_bytes(self.data+b'changed')
         with self.assertRaises(ValueError): self.run_prepare(httpx.Response(200, content=self.data))
         self.assertEqual(graph.read_bytes(), self.data+b'changed')
+    def test_valid_cache_works_without_url_or_network(self):
+        graph = Path(self.temp.name)/'fixture.db'; graph.write_bytes(self.data)
+        config = {k: v for k, v in self.config.items() if k not in {'CBM_GRAPH_URL', 'CBM_GRAPH_BEARER_TOKEN'}}
+        def offline(req):
+            self.fail('A valid cached snapshot must not make any HTTP request')
+        with patch.dict(os.environ, config, clear=True), httpx.Client(transport=httpx.MockTransport(offline)) as client:
+            self.assertEqual(m.prepare(client), graph)
+            self.assertEqual(m.prepare(client), graph)
+        self.assertEqual(graph.read_bytes(), self.data)
     def test_size_limit(self):
         self.config['CBM_GRAPH_MAX_BYTES'] = '10'
         with self.assertRaises(ValueError): self.run_prepare(httpx.Response(200, content=self.data))
