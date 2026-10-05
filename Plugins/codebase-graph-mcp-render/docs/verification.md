@@ -48,3 +48,7 @@ node gateway/scripts/check-access.mjs
 | 新 Git blob 与托管哈希不符 | 明确报告旧快照，更新配置并重新部署 |
 
 服务日志不能包含请求参数、图谱字节、下载 URL、Authorization、管理凭据或原始私人结果。
+
+## 单一插件验收
+
+MCP initialize 必须返回 Codebase Graph Reader 的 serverInfo.name 和完整 instructions；tools/list 必须只包含五个查询工具，带查询顺序、真实限定名和快照来源的说明。新增用户仅需安装 canonical 插件；验证过程不得依赖旧的额外指令插件。宿主若省略 initialize.instructions，使用工具说明继续同一流程。

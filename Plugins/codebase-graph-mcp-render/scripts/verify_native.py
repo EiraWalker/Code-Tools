@@ -27,8 +27,14 @@ async def verify(url, token, project):
         assert project not in response.text
     async with httpx.AsyncClient(trust_env=False, headers={'Authorization':'Bearer '+token}) as http, streamable_http_client(url,http_client=http) as (read,write,_):
         async with ClientSession(read,write) as client:
-            await client.initialize()
-            names = {t.name for t in (await client.list_tools()).tools}
+            initialized = await client.initialize()
+            assert initialized.serverInfo.name == 'codebase-graph-reader'
+            assert 'single MCP connection' in initialized.instructions
+            assert 'qualified name' in initialized.instructions
+            tools = (await client.list_tools()).tools
+            assert all(t.description for t in tools)
+            assert 'no separate Engine' in next(t.description for t in tools if t.name == 'list_projects')
+            names = {t.name for t in tools}
             assert names == {'list_projects','get_architecture','search_graph','trace_path','query_graph'}
             projects = await client.call_tool('list_projects',{})
             assert not projects.isError and projects.structuredContent['projects'][0]['name'] == project
@@ -83,6 +89,7 @@ def main():
             assert hashlib.sha256(copy.read_bytes()).hexdigest()==before
             assert hashlib.sha256(original.read_bytes()).hexdigest()==before
             report['snapshot_unchanged']=True
+            report['single_plugin_workflow']=True
             print(json.dumps(report))
         finally:
             process.terminate(); process.wait(timeout=5)

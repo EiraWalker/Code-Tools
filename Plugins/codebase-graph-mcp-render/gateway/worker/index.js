@@ -1,3 +1,12 @@
+const READER_INSTRUCTIONS = "Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Never expose service credentials or change project scope.";
+const TOOL_GUIDANCE = {
+  "list_projects": "Start here to obtain the real project name and snapshot provenance. Then use get_architecture, search_graph, trace_path with a returned qualified name, and query_graph for read-only relationships. This single Codebase Graph Reader connection includes the whole workflow; no separate Engine or instructions plugin is required.",
+  "get_architecture": "Use after list_projects to establish graph scope and limitations before searching symbols.",
+  "search_graph": "Use actual project names from list_projects. Reuse returned qualified names for trace_path; preserve paging and truncation.",
+  "trace_path": "Use a qualified name returned by search_graph or query_graph, not a guessed symbol. Missing edges may reflect snapshot coverage.",
+  "query_graph": "Run read-only Cypher through the native engine. Keep graph_snapshot provenance and report native errors; do not fall back to a custom SQL implementation."
+};
+
 const QUERY_TOOLS = new Set([
   "list_projects", "get_architecture", "search_graph", "trace_path", "query_graph"
 ]);
@@ -66,9 +75,18 @@ export default {
       if (response.status >= 300 && response.status < 400) {
         return reply({error: "Engine redirects are not permitted"}, 502);
       }
-      if (method === "tools/call" && response.ok && response.headers.get("content-type")?.includes("application/json")) {
+      if (["initialize", "tools/list", "tools/call"].includes(method) && response.ok && response.headers.get("content-type")?.includes("application/json")) {
         const result = await response.json();
-        const snapshot = result.result?._meta?.graph_snapshot;
+        if (method === "initialize" && result.result) {
+          result.result.serverInfo = {...result.result.serverInfo, name: "codebase-graph-reader"};
+          result.result.instructions = READER_INSTRUCTIONS;
+        }
+        if (method === "tools/list" && Array.isArray(result.result?.tools)) {
+          result.result.tools = result.result.tools.filter(tool => QUERY_TOOLS.has(tool.name)).map(tool => ({
+            ...tool, description: [tool.description, TOOL_GUIDANCE[tool.name]].filter(Boolean).join("\n\n")
+          }));
+        }
+        const snapshot = method === "tools/call" && result.result?._meta?.graph_snapshot;
         if (snapshot && !result.result.structuredContent?.graph_snapshot) {
           // ChatGPT may omit MCP _meta. Preserve the native payload and expose
           // its server-provided provenance through visible result channels too.

@@ -3,6 +3,7 @@ services:
   - type: web
     name: codebase-graph-engine
     runtime: python
+    rootDir: Plugins/codebase-graph-mcp-render
     plan: free
     region: oregon
     buildCommand: bash backend/build-render.sh

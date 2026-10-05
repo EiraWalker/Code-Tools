@@ -2,7 +2,7 @@
 
 把下面的任务段落复制给你的 Agent，并让它先阅读本仓库。不要把任何密钥粘贴进公开 issue 或 Discussion。
 
-> 使用这个仓库，为我自己的代码项目创建原生图谱查询插件和 Render 后端。直接读取 codebase-memory-mcp 的 `.db` 快照，不导出成文本，不使用自制 SQL 服务替代原生工具。复用我的已有连接；新增资源前检查是否已有对应资源。通过 Render API/插件管理部署。保留私有图谱与密钥，完成五个原生接口的实际查询验证，再报告插件链接、快照来源和未验证事项。需要 ChatGPT 插件时使用我账户自己的私有认证网关。不要把服务器发布成功当成工具调用成功。
+> 使用这个仓库，为我自己的代码项目创建单一 Codebase Graph Reader 插件和 Render 后端。插件必须同时提供工具和使用指令，不要创建两个 Reader/Engine 插件。直接读取 codebase-memory-mcp 的 `.db` 快照，不导出成文本，不使用自制 SQL 服务替代原生工具。复用我的已有连接；新增资源前检查是否已有对应资源。通过 Render API/插件管理部署。保留私有图谱与密钥，完成五个原生接口的实际查询验证，再报告插件链接、快照来源和未验证事项。需要 ChatGPT 插件时使用我账户自己的私有认证网关。不要把服务器发布成功当成工具调用成功。
 
 ## 1. 确认输入
 
@@ -22,7 +22,7 @@
 
 ## 2. 选择部署方式
 
-默认用本仓库 `render.yaml` 创建单个后端。服务名必须对当前用户唯一。
+默认用 `Plugins/codebase-graph-mcp-render/render.yaml` 创建单个后端，Blueprint 的 rootDir 已对应这个子目录。若将模板复制为独立仓库，移除 rootDir。服务名必须对当前用户唯一。
 确认已有服务时，读取实际配置，再选择原地更新或创建独立服务。不得凭名称覆盖其他服务。
 默认模板选择 `free`、关闭自动部署；不擅自升级到付费方案。
 
@@ -40,15 +40,15 @@
 ## 4. 创建自己的插件连接
 
 ChatGPT 路线按 `docs/plugin.md` 创建自己的 owner-private Sites MCP 网关，配置两个运行时变量，然后发布。
-Sites 生成的 canonical plugin 就是 Engine 连接，复用它，不再包一层重复的 MCP App。
+Sites 生成的 canonical plugin 就是唯一的 Codebase Graph Reader。保留真实连接身份，将 title 设为 Codebase Graph Reader，复用现有 App，不再创建额外指令插件或重复 MCP App。
 安装并完成连接后，在目标聊天宿主执行真实查询。
 
-可选：使用 `plugin-template/` 创建额外的指令插件。该包本身没有引擎。
-只有拿到平台返回的真实 App ID，才添加所需依赖；不能由 plugin ID 猜 App ID。
+查询工作流已在 `initialize.instructions` 和五个工具说明中提供。部署时验证这些字段，确保即使宿主省略初始化指令，工具说明仍包含操作引导。不得尝试用 Plugin Creator 的 archive editor 编辑 Sites canonical App；通过所属 Sites 源码更新。
 其他客户端按自己的认证能力连接 Render。若宿主要求 OAuth 而客户端只有静态 Bearer，先实现正确认证网关，不把两者混为一谈。
 
 ## 5. 验收并交付
 
+- 只需一个插件连接即可执行工作流；初始化和 tools/list 提供使用指令。
 - 五个接口都有实际调用结果；至少一次 `search_graph` 找到符号。
 - 从搜索/图查询中取得真实限定名，再调用 `trace_path`。
 - 节点计数与架构统计一致。

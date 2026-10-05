@@ -22,6 +22,9 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+READER_INSTRUCTIONS = 'Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Never expose service credentials or change project scope.'
+TOOL_GUIDANCE = {'list_projects': 'Start here to obtain the real project name and snapshot provenance. Then use get_architecture, search_graph, trace_path with a returned qualified name, and query_graph for read-only relationships. This single Codebase Graph Reader connection includes the whole workflow; no separate Engine or instructions plugin is required.', 'get_architecture': 'Use after list_projects to establish graph scope and limitations before searching symbols.', 'search_graph': 'Use actual project names from list_projects. Reuse returned qualified names for trace_path; preserve paging and truncation.', 'trace_path': 'Use a qualified name returned by search_graph or query_graph, not a guessed symbol. Missing edges may reflect snapshot coverage.', 'query_graph': 'Run read-only Cypher through the native engine. Keep graph_snapshot provenance and report native errors; do not fall back to a custom SQL implementation.'}
+
 PROJECT = os.environ["CBM_PROJECT"]
 if not PROJECT or PROJECT in {".", ".."} or any(c in PROJECT for c in "/\\\0"):
     raise ValueError("CBM_PROJECT must be one cache filename stem")
@@ -56,6 +59,8 @@ class Engine:
                                 capture_output=True, text=True, timeout=30, check=True)
         reply = next(x for x in map(json.loads, result.stdout.splitlines()) if x.get("id") == 2)
         self.tools = [types.Tool.model_validate(t) for t in reply["result"]["tools"] if t["name"] in EXPOSED]
+        for tool in self.tools:
+            tool.description = "\n\n".join(filter(None, [tool.description, TOOL_GUIDANCE[tool.name]]))
         if {t.name for t in self.tools} != EXPOSED:
             raise ValueError("Native engine did not expose the required query interfaces")
 
@@ -98,7 +103,7 @@ def create_app():
     if parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}):
         raise ValueError("Production origin must use HTTPS")
     engine = Engine()
-    server = Server("codebase-graph-reader", version="0.1.0")
+    server = Server("codebase-graph-reader", version="0.2.0", instructions=READER_INSTRUCTIONS)
     limit = anyio.CapacityLimiter(2)
 
     @server.list_tools()

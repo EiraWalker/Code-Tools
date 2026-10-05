@@ -17,6 +17,10 @@ flowchart TD
   F --> G["原始 SQLite 图谱快照"]
 ```
 
+## 单一插件
+
+同一 canonical MCP 连接提供五个查询工具、初始化使用指令和工具级说明。Reader Engine 是 Render 中的实现组件，不创建第二个插件。用户只连接 Codebase Graph Reader。
+
 ## 原生引擎
 
 `backend/native/standalone_main.c` 链接固定版本上游的嵌入 API。它建立单进程 MCP 实例、关闭后台任务、设置 analysis 工具 profile。

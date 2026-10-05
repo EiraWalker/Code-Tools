@@ -2,10 +2,10 @@
 
 ## Blueprint 路线
 
-Fork 或复制这个公开模板。导入根目录 `render.yaml`。为当前账户使用唯一服务名，选择适合预算的地域及方案。
+Fork `EiraWalker/Code-Tools`，在 Blueprint 创建页面指定 `Plugins/codebase-graph-mcp-render/render.yaml`。该文件的 `rootDir` 已设置为模板子目录。若将模板复制到独立仓库根目录，移除 `rootDir` 后导入根目录 `render.yaml`。为当前账户使用唯一服务名，选择适合预算的地域及方案。
 
 模板默认是 Python 3.12.12、Free、手动部署、健康检查 `/health`。
-构建命令 `bash backend/build-render.sh`；启动命令 `python backend/server.py`。
+构建命令 `bash backend/build-render.sh`；启动命令 `python backend/server.py`。直接通过 API 创建服务时也要将 rootDir 设置为 `Plugins/codebase-graph-mcp-render`；命令相对于 rootDir 执行。
 构建会安装锁定依赖、获取固定上游提交、编译单进程入口并校验快照。
 
 部署时配置以下私有输入：

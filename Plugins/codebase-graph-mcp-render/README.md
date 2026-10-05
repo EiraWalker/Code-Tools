@@ -4,6 +4,10 @@
 
 这是可复用的单项目部署模板。你提供自己有权访问的 `.db` 快照，配置自己的认证入口，并创建自己的插件。本仓库不包含任何真实图谱、账户凭据、私人项目资料或已部署服务地址。
 
+**只安装一个 Codebase Graph Reader 插件。** 使用指令通过 MCP `initialize.instructions` 和工具说明提供，不需要另装 Reader Engine 或 skills-only 包。
+
+本模板位于公开仓库 [EiraWalker/Code-Tools](https://github.com/EiraWalker/Code-Tools/tree/main/Plugins/codebase-graph-mcp-render) 的 `Plugins/codebase-graph-mcp-render/`。
+
 **先给 Agent 阅读 [AGENT_SETUP.md](AGENT_SETUP.md)。完整方案见 [docs/architecture.md](docs/architecture.md)。**
 
 ## 组件与数据流
@@ -12,7 +16,7 @@
 2. Render 构建固定版本的原生引擎，并获取、校验你的快照。
 3. Python 适配器将原生查询结果通过 Streamable HTTP MCP 返回。
 4. ChatGPT 路线使用私有 Sites 网关处理平台 OAuth；其他客户端可按自身能力直接连接 Render。
-5. 指令插件指导 Agent 使用已连接工具。
+5. 同一个 Codebase Graph Reader 插件同时提供五个工具和 MCP 使用指令；Render 引擎是后端服务。
 
 | 组件 | 作用 | 是否包含在模板中 |
 | --- | --- | --- |
@@ -20,7 +24,7 @@
 | Render 后端 | HTTP MCP、项目范围、校验和服务认证 | 是 |
 | 快照获取 | HTTPS 下载原始字节，拒绝重定向，校验后原子安装 | 是 |
 | ChatGPT 网关 | 转发 MCP；依赖 Sites 的可信身份边界 | 是，需在你自己的 Sites 项目部署 |
-| 指令插件 | 远程查询工作流 | 是，skills-only 模板 |
+| 查询指令 | MCP 初始化指令及各工具说明，随同一连接提供 | 是 |
 | 图谱与密钥 | 你的私人输入 | 否 |
 
 ## 五个接口
