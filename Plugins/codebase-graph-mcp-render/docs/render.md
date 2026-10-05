@@ -57,3 +57,7 @@ Render API key 是管理凭据，`CBM_SERVICE_TOKEN` 是查询后端凭据，`CB
 Free 会因空闲休眠，首次请求可能等待约一分钟。它使用临时文件系统，不支持持久磁盘。生产项目需要评估付费计算和存储。见 [官方限制](https://render.com/docs/free)。
 
 快照应在构建产物中准备，或在启动前从可重复授权来源恢复。这个模板采用构建阶段准备，不能把运行时临时上传的 `.db` 当成持久备份。
+
+## 多项目与 MCP 注册
+
+现有单项目私有输入兼容保留。固定多个初始索引可使用 `CBM_INDEXES_JSON`，动态添加使用 MCP `add_index`。`CBM_GITHUB_TOKEN` 是可选的 GitHub Contents read 后端凭据；`CBM_GITHUB_CHECK_SECONDS` 控制链接注册项目的元数据检查间隔。两者不是 Render 管理 API key 或 MCP 服务密钥。参见 [多索引说明](multiple-indexes.md)。

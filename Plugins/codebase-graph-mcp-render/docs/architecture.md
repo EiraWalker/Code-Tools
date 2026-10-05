@@ -19,7 +19,7 @@ flowchart TD
 
 ## 单一插件
 
-同一 canonical MCP 连接提供五个查询工具、初始化使用指令和工具级说明。Reader Engine 是 Render 中的实现组件，不创建第二个插件。用户只连接 Codebase Graph Reader。
+同一 canonical MCP 连接提供五个查询工具、`add_index`、初始化使用指令和工具级说明。Reader Engine 是 Render 中的实现组件，不创建第二个插件。用户只连接 Codebase Graph Reader。
 
 ## 原生引擎
 
@@ -47,7 +47,7 @@ ChatGPT 路线额外使用 Sites 的平台 OAuth 与 owner-private 访问控制�
 
 ## 快照来源
 
-查询始终读取 `CBM_CACHE_DIR` 中的本地 `.db`，不访问 GitHub，也不会调用下载脚本。构建阶段准备一次快照；已存在且校验匹配的文件直接复用，即使没有下载 URL 或网络也能通过准备步骤。临时 URL 刷新属于部署操作，不属于每次查询。运行时校验读取本地字节，原生引擎使用同一文件。
+原生查询读取 `CBM_CACHE_DIR` 中的本地 `.db`，不执行网络下载。固定项目查询不访问 GitHub；链接注册项目的适配层在间隔到期时检查小型 GitHub 元数据，只有 blob 改变才刷新缓存，再调用原生查询。构建阶段准备一次快照；已存在且校验匹配的文件直接复用，即使没有下载 URL 或网络也能通过准备步骤。临时 URL 刷新属于部署操作，不属于每次查询。运行时校验读取本地字节，原生引擎使用同一文件。
 
 MCP 宿主可能省略 `_meta`。所以后端在 `structuredContent.graph_snapshot` 和追加文本块中同时返回仓库、图谱路径及校验值。原生结果的原有字段和第一个文本块保持不变。
 

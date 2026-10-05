@@ -20,6 +20,7 @@ The script requires:
 | `CBM_READER_ORIGIN` | The HTTPS origin of your existing Render service |
 | `CBM_SYNC_GRAPH_FILE` | Path to the `.db` just committed to the destination |
 | `GITHUB_SHA` | Existing Actions source commit variable |
+| `CBM_SYNC_PROJECT` | Optional original project name; defaults to the graph file stem |
 
 Use the public script at a reviewed immutable commit, or copy the reviewed script
 into your existing workflow support directory and keep that copy in sync.
@@ -67,7 +68,7 @@ Run a single backend process/instance; cross-process coordination is not provide
 
 ## Persistence and verification
 
-Ordinary queries are entirely local, including after automatic synchronization.
+Queries for these workflow-managed indexes are entirely local, including after automatic synchronization. Dynamically registered GitHub indexes use interval-based metadata checks as described in [multiple indexes](multiple-indexes.md).
 The original build-time download remains a bootstrap mechanism for a fresh
 deployment, not the refresh mechanism. A valid runtime manifest can recover on
 the same surviving filesystem. Render Free loses runtime filesystem changes
@@ -89,3 +90,7 @@ Verify a publisher run completes with `Graph reader cache: refreshed.` or
 `unchanged.`. Then call `list_projects` and compare returned snapshot blob SHA,
 SHA256 and source commit with the file and provenance that the workflow published.
 Re-running synchronization with the same graph must skip the binary upload.
+
+## Multiple publisher scopes
+
+The sender includes `X-Snapshot-Project` on metadata and binary requests, using `CBM_SYNC_PROJECT` or the `.db` stem. It is mandatory when multiple projects exist. The backend selects that index and verifies its own configured publisher before reading metadata or accepting bytes. A token for another publisher cannot update this cache. When `CBM_INDEXES_JSON` is used, configure publisher identity per record instead of inheriting global single-project identity. `add_index` registrations default to GitHub blob checks, not OIDC upload permissions.

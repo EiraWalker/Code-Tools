@@ -36,3 +36,5 @@ Workers 不支持 `redirect: "error"`。这里使用 `manual` 并拒绝 3xx；�
 若客户端或 ChatGPT 要求 OAuth，需要符合宿主要求的认证实现。静态 Bearer 是服务认证，不等于 OAuth；请按 [MCP Authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization) 实现。
 
 `mcp.json` 的 transport/url 可以按客户端规范配置，但不要把长期 token 提交进去。宿主端秘密存储、OAuth 配置和本地环境变量能力必须逐项确认。
+
+新增 GitHub 图谱时，在同一 MCP 连接调用 `add_index`；它是经过授权的目录修改，不是只读查询。发现结果须包含此接口及五个原生查询工具。不要另建 Reader Engine 插件或为每个项目建独立 App。详见 [多索引使用方法](multiple-indexes.md)。
