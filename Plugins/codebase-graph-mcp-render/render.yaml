@@ -35,3 +35,12 @@ services:
         sync: false
       - key: CBM_GRAPH_BEARER_TOKEN
         sync: false
+      # Optional: the existing index-generating workflow's OIDC identity.
+      - key: CBM_SYNC_REPOSITORY
+        sync: false
+      - key: CBM_SYNC_REPOSITORY_ID
+        sync: false
+      - key: CBM_SYNC_REF
+        value: refs/heads/main
+      - key: CBM_SYNC_WORKFLOW
+        value: .github/workflows/code-index.yml

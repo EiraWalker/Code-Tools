@@ -43,6 +43,7 @@
 
 - [给 Agent 的完整执行指令](AGENT_SETUP.md)
 - [后续维护与 API 部署顺序](MAINTENANCE.md)
+- [复用已有索引 Actions 自动刷新缓存](docs/automatic-refresh.md)
 - [准备你自己的索引快照](docs/snapshot.md)
 - [Render 部署与 API 管理](docs/render.md)
 - [ChatGPT 插件与认证网关](docs/plugin.md)
