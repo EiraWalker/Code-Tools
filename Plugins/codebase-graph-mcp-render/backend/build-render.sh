@@ -7,6 +7,9 @@ upstream_commit=8972ea69c6ad94b1ef1d4ffbf0a92d78d2db1798
 
 python -m pip install --no-cache-dir -r "${service_dir}/requirements.lock"
 
+# Fetch signed sources before the long native compilation can expire their URL.
+python "${service_dir}/prepare_snapshot.py"
+
 if [[ ! -d "${source_dir}/.git" ]]; then
   git clone --depth 1 --branch v0.11.0 \
     https://github.com/DeusData/codebase-memory-mcp.git "${source_dir}"
@@ -18,4 +21,3 @@ make -C "${source_dir}" -f Makefile.cbm -j1 cbm \
 strip "${source_dir}/build/c/codebase-memory-mcp"
 "${source_dir}/build/c/codebase-memory-mcp" --version
 
-python "${service_dir}/prepare_snapshot.py"

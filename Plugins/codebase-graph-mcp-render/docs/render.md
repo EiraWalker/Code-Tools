@@ -6,7 +6,7 @@ Fork `EiraWalker/Code-Tools`，在 Blueprint 创建页面指定 `Plugins/codebas
 
 模板默认是 Python 3.12.12、Free、手动部署、健康检查 `/health`。
 构建命令 `bash backend/build-render.sh`；启动命令 `python backend/server.py`。直接通过 API 创建服务时也要将 rootDir 设置为 `Plugins/codebase-graph-mcp-render`；命令相对于 rootDir 执行。
-构建会安装锁定依赖、获取固定上游提交、编译单进程入口并校验快照。
+构建会先安装锁定依赖、下载并校验快照，再获取固定上游提交、编译单进程入口。下载在耗时编译之前进行。
 
 部署时配置以下私有输入：
 
@@ -40,7 +40,17 @@ Fork `EiraWalker/Code-Tools`，在 Blueprint 创建页面指定 `Plugins/codebas
 
 Render API key 是管理凭据，`CBM_SERVICE_TOKEN` 是查询后端凭据，`CBM_GRAPH_BEARER_TOKEN` 是图谱来源凭据。三者不能互换。
 
-官方文档：[API](https://render.com/docs/api)、[API reference](https://api-docs.render.com/reference/introduction)、[Blueprint](https://render.com/docs/blueprint-spec)。API schema 会演进，因此模板不附带容易过时的手写创建 JSON。
+官方文档：[API](https://render.com/docs/api)、[API reference](https://api-docs.render.com/reference/introduction)、[Blueprint](https://render.com/docs/blueprint-spec)。API schema 会演进；迁移已有服务前应根据当前官方 schema 核对字段。既有服务的仓库、分支和 rootDir 可由 [Update service](https://api-docs.render.com/reference/update-service) 修改，省略的字段保留。修改后必须另行触发部署。
+
+### 已有服务切换到本目录
+
+保持现有 service ID、origin、地域、方案和服务密钥。目标 repo 为 `https://github.com/EiraWalker/Code-Tools`，branch 为 `main`，rootDir 为 `Plugins/codebase-graph-mcp-render`；构建/启动命令使用上述相对路径。将 CBM_BINARY 设为 `backend/.cbm-upstream/build/c/codebase-memory-mcp`，CBM_CACHE_DIR 设为 `.runtime/cache`。原快照的项目名、来源仓库、路径和校验值仍属于私有部署配置。
+
+### 签名临时下载源
+
+有权限的 GitHub 插件可从私有仓库的 contents 目录元数据取得图谱的 `download_url`。该地址带临时访问凭据，必须像秘密一样处理：只在内存中保留并通过 Render API 合并到 CBM_GRAPH_URL，不打印、不提交、不写入公开记录。不要对二进制文件使用只支持文本的 fetch 接口。
+
+每次部署前重新获取该地址，核对 blob SHA，写入环境变量后立即通过 API 触发一次部署。签名 URL 路线要求 autoDeployTrigger 为 off；禁止从旧环境变量复用过期 URL或自动部署。下载失败时刷新 URL，再针对失败原因重试；不能关闭校验、将私人图谱公开或创建未经授权的长期 token。生产自动部署应改用稳定的授权源。详细顺序见 [维护指南](../MAINTENANCE.md)。
 
 ## 冷启动与数据持久性
 

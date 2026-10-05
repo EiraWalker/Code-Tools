@@ -14,7 +14,7 @@
 | 图谱文件 | 授权代码库的一致 `.db` 快照 |
 | 来源仓库及路径 | 用户指定的授权范围 |
 | Git blob SHA、SHA256 | 源文件元数据和本地校验 |
-| 快照下载入口 | 不会过期且可以重复取得相同字节的 HTTPS 入口 |
+| 快照下载入口 | 稳定授权 HTTPS 入口；若用签名临时 URL，每次部署前必须刷新 |
 | Render 工作区、地域、方案 | 用户已有资源及预算偏好 |
 | 插件宿主 | ChatGPT 或支持 Streamable HTTP 的其他客户端 |
 
@@ -24,7 +24,7 @@
 
 默认用 `Plugins/codebase-graph-mcp-render/render.yaml` 创建单个后端，Blueprint 的 rootDir 已对应这个子目录。若将模板复制为独立仓库，移除 rootDir。服务名必须对当前用户唯一。
 确认已有服务时，读取实际配置，再选择原地更新或创建独立服务。不得凭名称覆盖其他服务。
-默认模板选择 `free`、关闭自动部署；不擅自升级到付费方案。
+默认模板选择 `free`、关闭自动部署；不擅自升级到付费方案。后续唯一源码维护目录是 `EiraWalker/Code-Tools` 的 `Plugins/codebase-graph-mcp-render/`；维护流程见 `MAINTENANCE.md`。
 
 私有图谱由 `backend/prepare_snapshot.py` 从授权 HTTPS 源下载到 `.runtime/cache`。
 源 Bearer 凭据只在 Render 秘密环境变量中保存；不进入插件、Git 或日志。
