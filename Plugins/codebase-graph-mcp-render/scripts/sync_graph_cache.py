@@ -2,6 +2,7 @@
 
 Uses stdlib only. OIDC credentials and response bodies never enter logs.
 """
+import base64
 import hashlib
 import json
 import os
@@ -22,6 +23,21 @@ def exchange(origin):
         token = json.load(response)["value"]
     print("::add-mask::" + token, flush=True)
     print("GitHub OIDC publisher identity obtained.", flush=True)
+    # Diagnostic booleans only; the backend alone verifies JWT signatures.
+    claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
+    now = int(time.time())
+    hints = {"issuer_matches": claims.get("iss") == "https://token.actions.githubusercontent.com",
+             "audience_matches": claims.get("aud") == origin + "/snapshot-sync",
+             "repository_matches": claims.get("repository") == os.environ.get("GITHUB_REPOSITORY"),
+             "ref_matches": claims.get("ref") == os.environ.get("GITHUB_REF"),
+             "workflow_matches": claims.get("workflow_ref") == os.environ.get("GITHUB_WORKFLOW_REF"),
+             "event_matches": claims.get("event_name") == os.environ.get("GITHUB_EVENT_NAME"),
+             "source_commit_matches": claims.get("sha") == os.environ.get("GITHUB_SHA"),
+             "not_expired": int(claims.get("exp", 0)) > now,
+             "not_before_valid": int(claims.get("nbf", now + 1)) <= now,
+             "run_number_present": "run_number" in claims,
+             "run_attempt_present": "run_attempt" in claims}
+    print("OIDC diagnostic checks: " + json.dumps(hints, sort_keys=True), flush=True)
     return token
 
 

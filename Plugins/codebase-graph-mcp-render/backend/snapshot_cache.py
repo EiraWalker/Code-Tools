@@ -85,7 +85,8 @@ class SnapshotCache:
             if (run_number, run_attempt) < (self.active.run_number, self.active.run_attempt):
                 return "superseded"
             if identity["sha256"] == self.active.sha256 and identity["blob_sha"] == self.active.blob_sha:
-                updated = replace(self.active, run_number=run_number, run_attempt=run_attempt)
+                updated = replace(self.active, run_number=run_number, run_attempt=run_attempt,
+                                  source_commit=identity.get("source_commit", self.active.source_commit))
                 self._persist(updated)
                 self.active = updated
                 return "unchanged"

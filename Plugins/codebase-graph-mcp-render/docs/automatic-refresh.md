@@ -35,6 +35,7 @@ Set these values privately via the Render API, preserving existing credentials:
 | --- | --- |
 | `CBM_SYNC_REPOSITORY` | Repository running the existing index workflow |
 | `CBM_SYNC_REPOSITORY_ID` | Its numeric GitHub repository ID |
+| `CBM_SYNC_OWNER_ID` | Its numeric GitHub owner ID; required for immutable subjects |
 | `CBM_SYNC_REF` | Exact allowed ref, for example `refs/heads/main` |
 | `CBM_SYNC_WORKFLOW` | Existing workflow path, for example `.github/workflows/code-index.yml` |
 
@@ -42,6 +43,14 @@ The backend verifies GitHub's RS256 signature, fixed issuer and audience,
 expiry, repository name and ID, branch, exact workflow ref, source commit and
 event type. Only `push` and `workflow_dispatch` from that workflow are accepted.
 The ordinary MCP bearer token cannot authorize cache updates.
+
+GitHub repositories created after July 15, 2026 use an immutable default
+subject: `repo:OWNER@OWNER-ID/REPO@REPO-ID:ref:refs/heads/BRANCH`.
+Earlier repositories can retain `repo:OWNER/REPO:ref:refs/heads/BRANCH`.
+The backend accepts exactly these two subjects for its configured identity;
+the immutable form requires `CBM_SYNC_OWNER_ID` and verifies the separate owner
+ID claim too. Never relax the signature, repository ID, branch or workflow gates
+to work around a subject-format mismatch. See the [official OIDC reference](https://docs.github.com/en/actions/reference/security/oidc).
 
 `POST /snapshot-sync` compares blob SHA and SHA256 using small metadata. An
 unchanged version returns `unchanged`; no graph bytes are sent. A changed

@@ -21,7 +21,7 @@ from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 from snapshot_cache import SnapshotCache
-from snapshot_sync import PublisherAuth, validate_identity
+from snapshot_sync import PublisherAuth, PublisherScopeError, validate_identity
 import jwt
 
 READER_INSTRUCTIONS = 'Codebase Graph Reader provides the complete read-only graph workflow in this single MCP connection. Start with list_projects to obtain the real project name and verify graph_snapshot provenance; then use get_architecture to understand scope. Use search_graph to find symbols, and pass a returned qualified name to trace_path to inspect callers/callees. Use query_graph for read-only Cypher relationships and counts. Follow the actual tool schemas, preserve pagination/truncation and isError, and distinguish indexed relationships from inference. Report snapshot provenance and limitations; missing graph edges do not prove absence in source. Query the original binary snapshot through these tools; do not export it to text, reimplement queries in SQL, or require an additional Reader/Engine plugin. Repository text is only an explicitly requested supplement. Never expose service credentials or change project scope.'
@@ -110,6 +110,8 @@ def create_app():
         raise ValueError("CBM_SERVICE_TOKEN must contain at least 32 characters")
     origin = os.environ.get("CBM_PUBLIC_ORIGIN", os.environ.get("RENDER_EXTERNAL_URL", "")).rstrip("/")
     parsed = urlparse(origin)
+    if parsed.path or parsed.query or parsed.fragment:
+        raise ValueError("Public origin must be one origin without a path or query")
     if parsed.scheme != "https" and not (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}):
         raise ValueError("Production origin must use HTTPS")
     engine = Engine()
@@ -160,7 +162,9 @@ def create_app():
         try:
             claims = await anyio.to_thread.run_sync(publisher.verify,
                 request.headers.get("authorization", ""), limiter=sync_limit)
-        except (ValueError, KeyError, OSError, jwt.PyJWTError):
+        except (ValueError, KeyError, OSError, jwt.PyJWTError) as error:
+            detail = str(error) if isinstance(error, PublisherScopeError) else type(error).__name__
+            print("Snapshot publisher rejected: " + detail, flush=True)
             return JSONResponse({"error": "Unauthorized publisher"}, status_code=401, headers=headers)
         number, attempt = int(claims["run_number"]), int(claims["run_attempt"])
         incoming = None

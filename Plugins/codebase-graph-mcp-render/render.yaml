@@ -40,6 +40,8 @@ services:
         sync: false
       - key: CBM_SYNC_REPOSITORY_ID
         sync: false
+      - key: CBM_SYNC_OWNER_ID
+        sync: false
       - key: CBM_SYNC_REF
         value: refs/heads/main
       - key: CBM_SYNC_WORKFLOW

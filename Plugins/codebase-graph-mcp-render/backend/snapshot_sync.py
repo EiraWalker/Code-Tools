@@ -6,11 +6,16 @@ import jwt
 ISSUER = "https://token.actions.githubusercontent.com"
 
 
+class PublisherScopeError(ValueError):
+    """Contains only fixed policy field names, never claim values or tokens."""
+
+
 class PublisherAuth:
     def __init__(self, origin):
         self.audience = origin + "/snapshot-sync"
         self.repository = os.environ["CBM_SYNC_REPOSITORY"]
         self.repository_id = os.environ["CBM_SYNC_REPOSITORY_ID"]
+        self.owner_id = os.environ.get("CBM_SYNC_OWNER_ID")
         self.ref = os.environ.get("CBM_SYNC_REF", "refs/heads/main")
         workflow = os.environ.get("CBM_SYNC_WORKFLOW", ".github/workflows/code-index.yml")
         self.workflow_ref = self.repository + "/" + workflow + "@" + self.ref
@@ -25,10 +30,18 @@ class PublisherAuth:
         claims = jwt.decode(token, key, algorithms=["RS256"], issuer=ISSUER,
                             audience=self.audience, options={"require": ["exp", "iat", "nbf", "sub"]})
         expected = {"repository": self.repository, "repository_id": self.repository_id,
-                    "ref": self.ref, "workflow_ref": self.workflow_ref,
-                    "sub": "repo:" + self.repository + ":ref:" + self.ref}
-        if any(str(claims.get(k, "")) != v for k, v in expected.items()):
-            raise ValueError("Publisher is outside the configured workflow scope")
+                    "ref": self.ref, "workflow_ref": self.workflow_ref}
+        subjects = {"repo:" + self.repository + ":ref:" + self.ref}
+        if self.owner_id:
+            expected["repository_owner_id"] = self.owner_id
+            owner, repository = self.repository.split("/", 1)
+            subjects.add("repo:" + owner + "@" + self.owner_id + "/" + repository + "@" +
+                         self.repository_id + ":ref:" + self.ref)
+        mismatch = [k for k, v in expected.items() if str(claims.get(k, "")) != v]
+        if claims.get("sub") not in subjects:
+            mismatch.append("sub")
+        if mismatch:
+            raise PublisherScopeError("Policy fields: " + ", ".join(mismatch))
         if claims.get("event_name") not in {"push", "workflow_dispatch"}:
             raise ValueError("Unsupported publisher event")
         if not re.fullmatch(r"[a-f0-9]{40}", claims.get("sha", "")):

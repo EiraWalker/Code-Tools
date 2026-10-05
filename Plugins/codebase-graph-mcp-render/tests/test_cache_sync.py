@@ -47,6 +47,7 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(self.cache.check(identity(self.old), 1, 1), "unchanged")
         self.assertEqual(self.cache.check(identity(self.old), 1, 2), "unchanged")
         self.assertEqual((self.cache.active.directory / "fixture.db").read_bytes(), self.old)
+        self.assertEqual(self.cache.active.source_commit, "a" * 40)
 
     def test_refresh_survives_restart_and_older_run_is_rejected(self):
         self.assertEqual(self.install(), "refreshed")
@@ -111,6 +112,19 @@ class AuthTests(unittest.TestCase):
 
     def test_expected_publisher_signature_and_scope(self):
         self.assertEqual(self.auth.verify(self.signed())["run_number"], "2")
+
+    def test_immutable_subject_pins_both_owner_and_repository_ids(self):
+        self.auth.owner_id = "7"
+        claims = {**self.claims, "repository_owner_id": "7",
+                  "sub": "repo:owner@7/source@42:ref:refs/heads/main"}
+        self.assertEqual(self.auth.verify(self.signed(claims))["repository_id"], "42")
+        for changes in ({"repository_owner_id": "8"},
+                        {"sub": "repo:owner@8/source@42:ref:refs/heads/main"},
+                        {"sub": "repo:owner@7/source@43:ref:refs/heads/main"}):
+            with self.assertRaises(ValueError):
+                self.auth.verify(self.signed({**claims, **changes}))
+        # Older repositories remain supported under the same pinned owner ID.
+        self.assertEqual(self.auth.verify(self.signed({**self.claims, "repository_owner_id": "7"}))["run_number"], "2")
 
     def test_wrong_repository_workflow_branch_audience_and_expired_token_rejected(self):
         cases = {"repository_id": "43", "workflow_ref": "owner/source/.github/workflows/other.yml@refs/heads/main",
