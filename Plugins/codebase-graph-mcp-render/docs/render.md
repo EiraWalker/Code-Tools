@@ -50,7 +50,7 @@ Render API key 是管理凭据，`CBM_SERVICE_TOKEN` 是查询后端凭据，`CB
 
 有权限的 GitHub 插件可从私有仓库的 contents 目录元数据取得图谱的 `download_url`。该地址带临时访问凭据，必须像秘密一样处理：只在内存中保留并通过 Render API 合并到 CBM_GRAPH_URL，不打印、不提交、不写入公开记录。不要对二进制文件使用只支持文本的 fetch 接口。
 
-每次部署前重新获取该地址，核对 blob SHA，写入环境变量后立即通过 API 触发一次部署。签名 URL 路线要求 autoDeployTrigger 为 off；禁止从旧环境变量复用过期 URL或自动部署。下载失败时刷新 URL，再针对失败原因重试；不能关闭校验、将私人图谱公开或创建未经授权的长期 token。生产自动部署应改用稳定的授权源。详细顺序见 [维护指南](../MAINTENANCE.md)。
+每次部署前重新获取该地址，核对 blob SHA，先完成服务来源与命令配置，最后写入环境变量。当前 Render 插件的环境变量工具会自动触发部署，即使 autoDeployTrigger 为 off；使用它返回的 deploy ID，不要再触发一次。直接 REST 配置更新没有触发部署时，再立即调用部署 API。签名 URL 路线要求 autoDeployTrigger 为 off；禁止从旧环境变量复用过期 URL或自动部署。下载失败时刷新 URL，再针对失败原因重试；不能关闭校验、将私人图谱公开或创建未经授权的长期 token。生产自动部署应改用稳定的授权源。详细顺序见 [维护指南](../MAINTENANCE.md)。
 
 ## 冷启动与数据持久性
 
