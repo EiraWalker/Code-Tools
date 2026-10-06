@@ -13,7 +13,8 @@ from worker import run
 class Status:
     def __init__(self):
         self.lock = threading.Lock()
-        self.values = {"service_live": True, "automation_state": "waiting_for_authorization"}
+        self.values = {"service_live": True, "automation_state": "waiting_for_authorization",
+            "continuous_polling_enabled": continuous_polling_enabled()}
 
     def report(self, **values):
         with self.lock:
@@ -47,12 +48,20 @@ def handler(status):
     return Health
 
 
+def continuous_polling_enabled():
+    return os.getenv("CONTINUOUS_POLLING_ENABLED", "true").lower() == "true"
+
+
 def consume(vault, stop, status):
     while not stop.is_set():
         try:
             saved = vault.load()
             ready = bool(saved.get("account") and saved.get("gmail", {}).get("refresh_token") and saved.get("bundle_cookies"))
             if ready:
+                if not continuous_polling_enabled():
+                    status.report(automation_state="ready_requires_always_on_plan")
+                    stop.wait(30)
+                    continue
                 status.report(automation_state="starting")
                 run(vault, stop, report=status.report)
                 return

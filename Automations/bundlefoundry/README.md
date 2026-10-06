@@ -47,6 +47,8 @@ python setup_auth.py --bundle-only
 
 `server.py` 在常驻 Python Web 服务中启动单一监听器。`/health` 和 `/status` 返回服务及授权状态，不包含凭据、邮件内容或账户邮箱。未授权时，服务在线等待授权，不执行领取。该方案使用 Starter 计划，有费用；免费 Web 服务会休眠，不适合持续监听。
 
+如果 Render 工作区尚未添加付款方式，只能先部署免费状态预览。预览设定 `CONTINUOUS_POLLING_ENABLED=false`，即使导入授权也不会开始监听。添加付款方式并升级到常驻计划后，将该变量改为 `true` 并重新部署，才会启用监听。
+
 部署代码保存于 `EiraWalker/Code-Tools` 的 `automation/bundlefoundry-free-claims` 分支，目录为 `Automations/bundlefoundry`。该仓库公开，源码不含凭据或用户邮件。Render 的 Environment 页面需要导入授权脚本生成的 `state/.env.render` 两项秘密变量，然后重启服务。代码仓库不得包含 `state/`、OAuth JSON、密钥或 `.env`。`/status` 变为 `running` 后，再确认第一条 `status=claimed` 或 `status=already_owned` 日志；仅 HTTP 200 不能证明 Google 授权有效或已完成领取。
 
 通过当前 MCP 直接创建的服务使用临时本地缓存。重新部署会重放近 7 天邮件，并根据网站账户的已拥有状态避免重复领取；持久秘密环境变量保存首次授权的加密凭据。需要保留长期失败队列和最新会话文件时，`render.yaml` 已配置 1 GB 持久磁盘，可以通过 Blueprint 导入或 Dashboard 添加。挂载路径为 `/var/data`，对应 `STATE_DIR=/var/data`。加入磁盘前，不能依赖本地缓存跨部署保存。
